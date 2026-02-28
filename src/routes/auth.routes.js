@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { signUp, signIn, signOut, refresh, checkCode, sendEmail, checkStatus, decryptData } from '../controllers/auth.controller.js';
+import { signUp, signIn, signOut, refresh, decryptData, checkCode, sendEmail, googleLogin, checkStatus } from '../controllers/auth.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = Router();
@@ -211,5 +211,7 @@ router.post('/sendEmail', sendEmail);
  *         description: Invalid or missing encrypted data
  */
 router.post('/decryptData', decryptData);
+
+router.post('/google', googleLogin);
 
 export default router;

@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import path from 'path';
+import { OAuth2Client } from 'google-auth-library';
 import transporter from '../services/mailer.service.js';
 
 const signUpMessages = [
@@ -97,8 +98,8 @@ export const signIn = async (req, res) => {
 
         const { rows: existingUser } = await pool.query(
             isEmail
-                ? 'SELECT "userId", username, password, status FROM users WHERE email = $1'
-                : 'SELECT "userId", username, password, status FROM users WHERE username = $1',
+                ? 'SELECT "userId", username, email, password, status FROM users WHERE email = $1'
+                : 'SELECT "userId", username, email, password, status FROM users WHERE username = $1',
             [identifier]
         );
 
@@ -118,7 +119,40 @@ export const signIn = async (req, res) => {
         }
 
         if (user.status === 'pending') {
-            return res.status(403).json({ type: 'error', message: 'Check your email to activate your account' });
+            const verificationCode = Math.floor(100000 + Math.random() * 900000);
+
+            await pool.query(
+                'UPDATE users SET "verificationCode" = $1 WHERE "userId" = $2',
+                [verificationCode, user.userId]
+            );
+
+            // Re-send verification email
+            const fullStringCode = String(verificationCode).padStart(6, '0');
+            const encryptedEmailArg = encryptData(user.email);
+
+            try {
+                const html = buildVerificationEmailHtml(user.username, fullStringCode, user.email);
+                const svgPath = path.join(process.cwd(), 'public', 'img', 'weighs.svg');
+                await transporter.sendMail({
+                    from: `"FitForge" <${process.env.GMAIL_EMAIL}>`,
+                    to: user.email,
+                    subject: '\u{1F510} Your FitForge Verification Code',
+                    html,
+                    attachments: [{
+                        filename: 'weighs.svg',
+                        path: svgPath,
+                        cid: 'fitforgelogo'
+                    }]
+                });
+            } catch (emailError) {
+                console.error('Error resending verification email:', emailError);
+            }
+
+            return res.status(403).json({
+                type: 'pending_activation',
+                message: 'Check your email to activate your account. A new email has been sent.',
+                encryptedEmail: encryptedEmailArg
+            });
         }
 
         const accessToken = jwt.sign(
@@ -442,3 +476,101 @@ export const decryptData = async (req, res) => {
     }
 }
 
+// ── Google OAuth Login ───────────────
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+export const googleLogin = async (req, res) => {
+    try {
+        const { credential } = req.body;
+        const rememberMe = req.body.rememberMe === true || req.body.rememberme === true;
+
+        if (!credential) {
+            return res.status(400).json({ type: 'error', message: 'No credential provided' });
+        }
+
+        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${credential}` }
+        });
+
+        if (!userInfoResponse.ok) {
+            throw new Error(`Google API rejected the token with status: ${userInfoResponse.status}`);
+        }
+
+        const payload = await userInfoResponse.json();
+        const { email, name, sub: googleId } = payload;
+
+        let { rows: existingUser } = await pool.query(
+            'SELECT "userId", username, status FROM users WHERE email = $1',
+            [email]
+        );
+
+        let user;
+
+        if (existingUser.length > 0) {
+            user = existingUser[0];
+
+            if (user.status === 'inactive') {
+                return res.status(403).json({ type: 'error', message: 'User is inactive' });
+            }
+
+            // Mapear cuentas existentes que inician con Google
+            await pool.query(
+                'UPDATE users SET "googleId" = $1, status = $2 WHERE "userId" = $3',
+                [googleId, 'active', user.userId]
+            );
+        } else {
+            // Generar una contraseña aleatoria súper segura (nunca la usarán)
+            const randomPassword = crypto.randomBytes(32).toString('hex');
+            const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+            // Generar username único basado en su nombre
+            const baseUsername = name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'user';
+            const uniqueSuffix = Math.floor(1000 + Math.random() * 9000);
+            const generatedUsername = `${baseUsername}${uniqueSuffix}`;
+
+            const { rows: newUser } = await pool.query(
+                `INSERT INTO users (email, username, password, status, "googleId") 
+                 VALUES ($1, $2, $3, $4, $5) RETURNING "userId", username, status`,
+                [email, generatedUsername, hashedPassword, 'active', googleId]
+            );
+            user = newUser[0];
+        }
+
+        const accessToken = jwt.sign(
+            { userId: user.userId, username: user.username },
+            process.env.JWT_SECRET,
+            { expiresIn: '30m' }
+        );
+
+        const refreshExpiresIn = rememberMe ? '30d' : '1d';
+        const refreshCookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined;
+
+        const refreshToken = jwt.sign(
+            { userId: user.userId, username: user.username },
+            process.env.JWT_REFRESH_SECRET,
+            { expiresIn: refreshExpiresIn }
+        );
+
+        res.cookie('token', accessToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            path: '/',
+            maxAge: 30 * 60 * 1000
+        });
+
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            path: '/',
+            maxAge: refreshCookieMaxAge
+        });
+
+        const message = randomMessage(signInMessages, user.username);
+        return res.status(200).json({ type: 'success', message, user });
+    } catch (error) {
+        console.error('Google login error:', error);
+        return res.status(401).json({ type: 'error', message: `Google Token Error: ${error.message}` });
+    }
+};
