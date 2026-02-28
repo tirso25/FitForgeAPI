@@ -212,6 +212,29 @@ router.post('/sendEmail', sendEmail);
  */
 router.post('/decryptData', decryptData);
 
+/**
+ * @swagger
+ * /api/auth/google:
+ *   post:
+ *     summary: Google OAuth login
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: Google OAuth token
+ *     responses:
+ *       200:
+ *         description: User logged in successfully. Sets token and refreshToken cookies.
+ *       401:
+ *         description: Invalid Google token
+ */
 router.post('/google', googleLogin);
 
 export default router;
