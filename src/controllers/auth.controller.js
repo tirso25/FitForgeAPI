@@ -60,17 +60,12 @@ export const signUp = async (req, res) => {
         // Auto-send verification email
         try {
             const html = buildVerificationEmailHtml(username, verificationCode, email);
-            const svgPath = path.join(process.cwd(), 'public', 'img', 'weighs.svg');
+
             await transporter.sendMail({
                 from: `"FitForge" <${process.env.GMAIL_EMAIL}>`,
                 to: email,
                 subject: '\u{1F510} Your FitForge Verification Code',
-                html,
-                attachments: [{
-                    filename: 'weighs.svg',
-                    path: svgPath,
-                    cid: 'fitforgelogo'
-                }]
+                html
             });
         } catch (emailError) {
             console.error('Error sending verification email:', emailError);
@@ -272,7 +267,7 @@ function buildVerificationEmailHtml(username, verificationCode, email) {
                             <table role="presentation" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td style="background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:16px;padding:14px;">
-                                        <img src="cid:fitforgelogo" alt="FitForge" width="40" height="40" style="display:block;" />
+                                        <img src="${FRONTEND_URL}/img/weighs.svg" alt="FitForge" width="40" height="40" style="display:block;" />
                                     </td>
                                     <td style="padding-left:14px;">
                                         <span style="font-size:26px;font-weight:700;color:#e2e8f0;letter-spacing:-0.5px;">FitForge</span>
@@ -428,18 +423,12 @@ export const sendEmail = async (req, res) => {
 
         const { username, verificationCode } = rows[0];
         const html = buildVerificationEmailHtml(username, verificationCode, email);
-        const svgPath = path.join(process.cwd(), 'public', 'img', 'weighs.svg');
 
         await transporter.sendMail({
             from: `"FitForge" <${process.env.GMAIL_EMAIL}>`,
             to: email,
             subject: '\u{1F510} Your FitForge Verification Code',
-            html,
-            attachments: [{
-                filename: 'weighs.svg',
-                path: svgPath,
-                cid: 'fitforgelogo'
-            }]
+            html
         });
 
         return res.status(200).json({ type: 'success', message: 'Verification email sent successfully' });
