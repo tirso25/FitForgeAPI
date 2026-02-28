@@ -140,6 +140,7 @@ export const signIn = async (req, res) => {
             httpOnly: true,
             secure: true,
             sameSite: 'none',
+            path: '/',
             maxAge: 30 * 60 * 1000
         });
 
@@ -147,6 +148,7 @@ export const signIn = async (req, res) => {
             httpOnly: true,
             secure: true,
             sameSite: 'none',
+            path: '/',
             maxAge: refreshCookieMaxAge
         });
 
@@ -161,8 +163,8 @@ export const signIn = async (req, res) => {
 
 export const signOut = async (req, res) => {
     try {
-        res.clearCookie('token');
-        res.clearCookie('refreshToken');
+        res.clearCookie('token', { path: '/', secure: true, sameSite: 'none' });
+        res.clearCookie('refreshToken', { path: '/', secure: true, sameSite: 'none' });
 
         return res.status(200).json({ type: 'success', message: 'User signed out successfully' });
     } catch (error) {
@@ -190,6 +192,7 @@ export const refresh = async (req, res) => {
             httpOnly: true,
             secure: true,
             sameSite: 'none',
+            path: '/',
             maxAge: 30 * 60 * 1000
         });
 
