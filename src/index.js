@@ -1,6 +1,8 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import cookieParser from 'cookie-parser'
 import { PORT } from './config.js'
 import userRoutes from './routes/users.routes.js'
@@ -10,15 +12,24 @@ import morgan from 'morgan'
 import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec } from './swagger.js'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
 const app = express()
 
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:4000',
+        'https://fitforge-murex.vercel.app'
+    ],
     credentials: true
 }))
 app.use(morgan('dev'))
 app.use(express.json())
 app.use(cookieParser())
+app.use(express.static(path.join(__dirname, '..', 'public')))
 app.use('/api/users', userRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/chatbot', chatbotRoutes)

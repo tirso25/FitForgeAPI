@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { signUp, signIn, signOut, refresh, verifyCode } from '../controllers/auth.controller.js';
+import { signUp, signIn, signOut, refresh, checkCode, sendEmail, checkStatus, decryptData } from '../controllers/auth.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = Router();
@@ -8,7 +8,7 @@ const router = Router();
  * @swagger
  * /api/auth/signup:
  *   post:
- *     summary: Register a new user
+ *     summary: Register a new user and send verification email
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -31,13 +31,9 @@ const router = Router();
  *                 format: password
  *     responses:
  *       201:
- *         description: User created successfully
+ *         description: User created and verification email sent
  *       400:
  *         description: Validation error or passwords do not match
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
  *       409:
  *         description: Email or username already exists
  */
@@ -110,33 +106,110 @@ router.post('/refresh', refresh);
 
 /**
  * @swagger
- * /api/users/verifyCode:
- *   put:
- *     summary: Verify a 6-digit code for the current user
- *     tags: [Users]
- *     security:
- *       - cookieAuth: []
+ * /api/auth/checkStatus:
+ *   post:
+ *     summary: Check the status of a user by email (public)
+ *     tags: [Auth]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [code]
+ *             required: [email]
  *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Returns the user status (pending, active, inactive)
+ *       404:
+ *         description: User not found
+ */
+router.post('/checkStatus', checkStatus);
+
+/**
+ * @swagger
+ * /api/auth/checkCode:
+ *   post:
+ *     summary: Verify a 6-digit code and activate the user (public)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, code]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
  *               code:
  *                 type: string
  *                 example: "123456"
  *     responses:
  *       200:
- *         description: Code verified successfully
+ *         description: Account activated successfully
  *       400:
- *         description: Invalid code format
+ *         description: Invalid code format or account already activated
  *       401:
- *         description: Unauthorized
+ *         description: Invalid verification code
  *       404:
  *         description: User not found
  */
-router.put('/verifyCode', authenticate, verifyCode)
+router.post('/checkCode', checkCode);
+
+/**
+ * @swagger
+ * /api/auth/sendEmail:
+ *   post:
+ *     summary: Send or resend verification email (public)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Verification email sent successfully
+ *       400:
+ *         description: Account already activated
+ *       404:
+ *         description: User not found
+ */
+router.post('/sendEmail', sendEmail);
+
+/**
+ * @swagger
+ * /api/auth/decryptData:
+ *   post:
+ *     summary: Decrypt an encrypted parameter from the email link (public)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [encrypted]
+ *             properties:
+ *               encrypted:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Returns the decrypted string
+ *       400:
+ *         description: Invalid or missing encrypted data
+ */
+router.post('/decryptData', decryptData);
 
 export default router;
