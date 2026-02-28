@@ -138,11 +138,15 @@ export const signIn = async (req, res) => {
 
         res.cookie('token', accessToken, {
             httpOnly: true,
+            secure: true,
+            sameSite: 'none',
             maxAge: 30 * 60 * 1000
         });
 
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
+            secure: true,
+            sameSite: 'none',
             maxAge: refreshCookieMaxAge
         });
 
@@ -184,6 +188,8 @@ export const refresh = async (req, res) => {
 
         res.cookie('token', accessToken, {
             httpOnly: true,
+            secure: true,
+            sameSite: 'none',
             maxAge: 30 * 60 * 1000
         });
 
