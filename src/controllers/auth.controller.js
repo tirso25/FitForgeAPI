@@ -15,8 +15,6 @@ const signUpMessages = [
     'First step taken, {{username}}. Now go for it.',
 ];
 
-const weighsSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="m826-585-56-56 30-31-128-128-31 30-57-57 30-31q23-23 57-22.5t57 23.5l129 129q23 23 23 56.5T857-615l-31 30ZM346-104q-23 23-56.5 23T233-104L104-233q-23-23-23-56.5t23-56.5l30-30 57 57-31 30 129 129 30-31 57 57-30 30Zm397-336 57-57-303-303-57 57 303 303ZM463-160l57-58-302-302-58 57 303 303Zm-6-234 110-109-64-64-109 110 63 63Zm63 290q-23 23-57 23t-57-23L104-406q-23-23-23-57t23-57l57-57q23-23 56.5-23t56.5 23l63 63 110-110-63-62q-23-23-23-57t23-57l57-57q23-23 56.5-23t56.5 23l303 303q23 23 23 56.5T857-441l-57 57q-23 23-57 23t-57-23l-62-63-110 110 63 63q23 23 23 56.5T577-161l-57 57Z"/></svg>`;
-
 const signInMessages = [
     'Welcome back, {{username}}. Let\'s go strong.',
     '{{username}}, today is training day.',
@@ -66,12 +64,7 @@ export const signUp = async (req, res) => {
                 from: `"FitForge" <${process.env.GMAIL_EMAIL}>`,
                 to: email,
                 subject: '\u{1F510} Your FitForge Verification Code',
-                html,
-                attachments: [{
-                    filename: 'weighs.svg',
-                    content: weighsSvgContent,
-                    cid: 'fitforgelogo'
-                }]
+                html
             });
         } catch (emailError) {
             console.error('Error sending verification email:', emailError);
@@ -273,7 +266,7 @@ function buildVerificationEmailHtml(username, verificationCode, email) {
                             <table role="presentation" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td style="background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:16px;padding:14px;">
-                                        <img src="cid:fitforgelogo" alt="FitForge" width="40" height="40" style="display:block;" />
+                                        <img src="${FRONTEND_URL}/img/weighs.png" alt="FitForge" width="40" height="40" style="display:block;" />
                                     </td>
                                     <td style="padding-left:14px;">
                                         <span style="font-size:26px;font-weight:700;color:#e2e8f0;letter-spacing:-0.5px;">FitForge</span>
@@ -434,12 +427,7 @@ export const sendEmail = async (req, res) => {
             from: `"FitForge" <${process.env.GMAIL_EMAIL}>`,
             to: email,
             subject: '\u{1F510} Your FitForge Verification Code',
-            html,
-            attachments: [{
-                filename: 'weighs.svg',
-                content: weighsSvgContent,
-                cid: 'fitforgelogo'
-            }]
+            html
         });
 
         return res.status(200).json({ type: 'success', message: 'Verification email sent successfully' });
