@@ -13,7 +13,12 @@
     "type": "git",
     "url": "git+https://github.com/tirso25/FitForgeAPI.git"
   },
-  "keywords": ["fitness", "gym", "api", "nodejs"],
+  "keywords": [
+    "fitness",
+    "gym",
+    "api",
+    "nodejs"
+  ],
   "author": "Tirso",
   "license": "ISC",
   "bugs": {
@@ -21,11 +26,18 @@
   },
   "homepage": "https://github.com/tirso25/FitForgeAPI#readme",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "dotenv": "^17.2.3",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
-    "pg": "^8.17.2"
+    "pg": "^8.17.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"
