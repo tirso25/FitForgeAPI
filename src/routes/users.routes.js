@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { updateUser, deleteUser, getMyProfile, profileOk, updateProfile } from '../controllers/users.controlles.js';
+import { updateUser, deleteUser, getMyProfile, profileOk, updateProfile, deleteAiInfo } from '../controllers/users.controlles.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = Router();
@@ -151,5 +151,23 @@ router.get('/profile', authenticate, profileOk)
  *         description: User not found
  */
 router.put('/profile', authenticate, updateProfile)
+
+/**
+ * @swagger
+ * /api/users/ai-info:
+ *   delete:
+ *     summary: Delete the current user's AI info
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: AI info deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ */
+router.delete('/ai-info', authenticate, deleteAiInfo)
 
 export default router;

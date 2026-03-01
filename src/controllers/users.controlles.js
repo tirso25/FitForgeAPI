@@ -3,65 +3,70 @@ import { validate } from '../utils/validators.js';
 import bcrypt from 'bcrypt';
 
 export const updateUser = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { userId } = req.user;
-        const updates = [];
-        const values = [];
+        await client.query('BEGIN');
+
+        // --- 1. Update users table (username, password) ---
+        const userUpdates = [];
+        const userValues = [];
         let paramCount = 1;
 
         if (req.body.username !== undefined) {
-            updates.push(`username = $${paramCount++}`);
-            values.push(validate.username(req.body.username));
+            userUpdates.push(`username = $${paramCount++}`);
+            userValues.push(validate.username(req.body.username));
         }
-
 
         if (req.body.password !== undefined) {
             const hashedPassword = await bcrypt.hash(validate.password(req.body.password), 10);
-            updates.push(`password = $${paramCount++}`);
-            values.push(hashedPassword);
+            userUpdates.push(`password = $${paramCount++}`);
+            userValues.push(hashedPassword);
         }
 
-        if (req.body.weight !== undefined) {
-            updates.push(`weight = $${paramCount++}`);
-            values.push(validate.weight(req.body.weight));
+        if (userUpdates.length > 0) {
+            userValues.push(userId);
+            const { rows } = await client.query(
+                `UPDATE users SET ${userUpdates.join(', ')} WHERE "userId" = $${paramCount} RETURNING "userId"`,
+                userValues
+            );
+            if (rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ error: 'User not found' });
+            }
         }
 
-        if (req.body.height !== undefined) {
-            updates.push(`height = $${paramCount++}`);
-            values.push(validate.height(req.body.height));
+        // --- 2. Update user_profiles table (weight, height, age, gender) ---
+        const weight = req.body.weight !== undefined ? validate.weight(req.body.weight) : undefined;
+        const height = req.body.height !== undefined ? validate.height(req.body.height) : undefined;
+        const age = req.body.age !== undefined ? validate.age(req.body.age) : undefined;
+        const gender = req.body.gender !== undefined ? validate.gender(req.body.gender) : undefined;
+
+        if (weight !== undefined && height !== undefined && age !== undefined && gender !== undefined) {
+            await client.query(
+                `INSERT INTO user_profiles (user_id, weight, height, age, gender, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+                 ON CONFLICT (user_id) DO UPDATE SET
+                   weight = EXCLUDED.weight,
+                   height = EXCLUDED.height,
+                   age = EXCLUDED.age,
+                   gender = EXCLUDED.gender,
+                   updated_at = CURRENT_TIMESTAMP`,
+                [userId, weight, height, age, gender]
+            );
         }
 
-        if (req.body.age !== undefined) {
-            updates.push(`age = $${paramCount++}`);
-            values.push(validate.age(req.body.age));
-        }
-
-        if (req.body.gender !== undefined) {
-            updates.push(`gender = $${paramCount++}`);
-            values.push(validate.gender(req.body.gender));
-        }
-
-        if (updates.length === 0) {
-            return res.status(400).json({ error: 'No fields to update' });
-        }
-
-        values.push(userId);
-
-        const { rows } = await pool.query(
-            `UPDATE users SET ${updates.join(', ')} WHERE "userId" = $${paramCount} RETURNING "userId"`,
-            values
-        );
-
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
+        await client.query('COMMIT');
         res.status(200).json({ message: 'User updated successfully' });
     } catch (error) {
+        await client.query('ROLLBACK');
         if (error.code === '23505') {
             return res.status(409).json({ error: 'Email or username already exists' });
         }
+        console.error('Error updating user:', error);
         res.status(400).json({ error: error.message });
+    } finally {
+        client.release();
     }
 }
 
@@ -133,6 +138,12 @@ export const updateProfile = async (req, res) => {
         const age = validate.age(req.body.age);
         const gender = validate.gender(req.body.gender);
 
+        const { rows } = await pool.query('SELECT * FROM user_ai_info WHERE user_id = $1', [userId]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
         await pool.query(
             `INSERT INTO user_profiles (user_id, weight, height, age, gender, updated_at)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
@@ -149,5 +160,24 @@ export const updateProfile = async (req, res) => {
     } catch (error) {
         console.error('Error updating user profile:', error);
         res.status(400).json({ error: error.message });
+    }
+}
+
+export const deleteAiInfo = async (req, res) => {
+    try {
+        const { userId } = req.user;
+
+        const { rows } = await pool.query('SELECT * FROM chat_history WHERE user_id = $1', [userId]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        await pool.query('DELETE FROM chat_history WHERE user_id = $1', [userId]);
+
+        res.status(200).json({ message: 'AI info deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting AI info:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 }
