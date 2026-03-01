@@ -97,6 +97,39 @@ router.put('/delete', authenticate, deleteUser)
  */
 router.get('/update', authenticate, getMyProfile)
 
+/**
+ * @swagger
+ * /api/users/update:
+ *   put:
+ *     summary: Update the current user's profile
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               weight:
+ *                 type: number
+ *               height:
+ *                 type: number
+ *               age:
+ *                 type: number
+ *               gender:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User profile updated successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ */
 router.put('/update', authenticate, updateUser)
 
 /**
