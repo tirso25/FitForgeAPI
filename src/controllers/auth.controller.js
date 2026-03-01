@@ -474,7 +474,6 @@ export const checkEmail = async (req, res) => {
     }
 }
 
-// ── Public: verify code and change password ─────────────
 export const resetPassword = async (req, res) => {
     try {
         const code = validate.code(req.body.verificationCode);
@@ -507,7 +506,6 @@ export const resetPassword = async (req, res) => {
     }
 }
 
-// ── Public: send/resend verification email by email ─────
 export const sendEmail = async (req, res) => {
     try {
         const email = validate.email(req.body.email);
@@ -542,7 +540,6 @@ export const sendEmail = async (req, res) => {
     }
 }
 
-// ── Public: decrypt data from email link ───────────────
 export const decryptData = async (req, res) => {
     try {
         const { encrypted } = req.body;
@@ -569,7 +566,6 @@ export const decryptData = async (req, res) => {
     }
 }
 
-// ── Google OAuth Login ───────────────
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const googleLogin = async (req, res) => {
