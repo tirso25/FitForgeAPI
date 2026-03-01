@@ -244,10 +244,19 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
 
 // ── Helper: build verification email HTML ──────────────
-function buildVerificationEmailHtml(username, verificationCode, email) {
+function buildVerificationEmailHtml(username, verificationCode, email, type = 'signUp') {
     const encryptedCode = encryptData(verificationCode);
     const encryptedEmail = encryptData(email);
-    const checkCodeUrl = `${FRONTEND_URL}/checkCode?e=${encodeURIComponent(encryptedEmail)}&c=${encodeURIComponent(encryptedCode)}`;
+
+    const actionUrl = type === 'changePassword'
+        ? `${FRONTEND_URL}/changePassword?c=${encodeURIComponent(encryptedCode)}`
+        : `${FRONTEND_URL}/checkCode?e=${encodeURIComponent(encryptedEmail)}&c=${encodeURIComponent(encryptedCode)}`;
+
+    const title = type === 'changePassword' ? 'Change Password' : 'Welcome to FitForge!';
+    const messageHtml = type === 'changePassword'
+        ? `You have requested to reset your password, <strong style="color:#e2e8f0;">${username}</strong>.<br/>Here is your verification code to proceed.`
+        : `Thank you for registering, <strong style="color:#e2e8f0;">${username}</strong>.<br/>We're delighted to have you join our community.`;
+    const buttonText = type === 'changePassword' ? 'Reset Password' : 'Verify my account';
 
     return `
 <!DOCTYPE html>
@@ -280,15 +289,14 @@ function buildVerificationEmailHtml(username, verificationCode, email) {
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td align="center" style="padding-bottom:24px;">
-                                        <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">Welcome to FitForge!</h1>
+                                        <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">${title}</h1>
                                     </td>
                                 </tr>
                             </table>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td align="center" style="color:#94a3b8;font-size:15px;line-height:1.7;padding-bottom:28px;">
-                                        Thank you for registering, <strong style="color:#e2e8f0;">${username}</strong>.<br/>
-                                        We're delighted to have you join our community.
+                                        ${messageHtml}
                                     </td>
                                 </tr>
                             </table>
@@ -324,8 +332,8 @@ function buildVerificationEmailHtml(username, verificationCode, email) {
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td align="center">
-                                        <a href="${checkCodeUrl}" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:12px;">
-                                            Verify my account
+                                        <a href="${actionUrl}" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:12px;">
+                                            ${buttonText}
                                         </a>
                                     </td>
                                 </tr>
@@ -398,6 +406,103 @@ export const checkCode = async (req, res) => {
         return res.status(200).json({ type: 'success', message: 'Account activated successfully! You can now log in.' });
     } catch (error) {
         console.error('Error verifying code:', error);
+        return res.status(400).json({ type: 'error', message: error.message });
+    }
+}
+
+export const checkEmail = async (req, res) => {
+    try {
+        const email = validate.email(req.body.email);
+        const type = req.body.type || 'changePassword';
+
+        const { rows } = await pool.query(
+            'SELECT "userId", username, status FROM users WHERE email = $1',
+            [email]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ type: 'error', message: 'User not found' });
+        }
+
+        const user = rows[0];
+
+        if (user.status === 'inactive') {
+            return res.status(200).json({ status: 'inactive', message: 'Account deactivated' });
+        }
+
+        // Generate a new 6-digit verification code
+        const verificationCode = crypto.randomInt(100000, 999999).toString();
+
+        // Save the new code in the database
+        await pool.query(
+            'UPDATE users SET "verificationCode" = $1 WHERE email = $2',
+            [verificationCode, email]
+        );
+
+        if (user.status === 'pending') {
+            // Send standard activation email
+            const html = buildVerificationEmailHtml(user.username, verificationCode, email, 'signUp');
+
+            await transporter.sendMail({
+                from: `"FitForge" <${process.env.GMAIL_EMAIL}>`,
+                to: email,
+                subject: '\u{1F510} Your FitForge Verification Code',
+                html
+            });
+
+            return res.status(200).json({
+                status: 'pending',
+                message: 'Activation email resent',
+                encryptedEmail: encryptData(email)
+            });
+        }
+
+        // Send the change password email
+        const html = buildVerificationEmailHtml(user.username, verificationCode, email, type);
+
+        await transporter.sendMail({
+            from: `"FitForge" <${process.env.GMAIL_EMAIL}>`,
+            to: email,
+            subject: type === 'changePassword' ? '\u{1F512} FitForge Password Reset' : '\u{1F510} Your FitForge Verification Code',
+            html
+        });
+
+        return res.status(200).json({ status: user.status, message: 'Verification email sent' });
+    } catch (error) {
+        console.error('Error checking email:', error);
+        return res.status(400).json({ type: 'error', message: error.message });
+    }
+}
+
+// ── Public: verify code and change password ─────────────
+export const resetPassword = async (req, res) => {
+    try {
+        const code = validate.code(req.body.verificationCode);
+        const password = validate.password(req.body.password);
+
+        const { rows } = await pool.query(
+            'SELECT "userId", "verificationCode" FROM users WHERE "verificationCode" = $1',
+            [code]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ type: 'error', message: 'User not found' });
+        }
+
+        if (rows[0].verificationCode !== code) {
+            return res.status(401).json({ type: 'error', message: 'Invalid verification code' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        await pool.query(
+            'UPDATE users SET password = $1, "verificationCode" = null WHERE "verificationCode" = $2',
+            [hashedPassword, code]
+        );
+
+        return res.status(200).json({ type: 'success', message: 'Password changed successfully! You can now log in.' });
+    } catch (error) {
+        console.error('Error resetting password:', error);
         return res.status(400).json({ type: 'error', message: error.message });
     }
 }

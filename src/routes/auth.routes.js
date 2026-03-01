@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { signUp, signIn, signOut, refresh, decryptData, checkCode, sendEmail, googleLogin, checkStatus } from '../controllers/auth.controller.js';
+import { signUp, signIn, signOut, refresh, decryptData, checkCode, sendEmail, googleLogin, checkStatus, checkEmail, resetPassword } from '../controllers/auth.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = Router();
@@ -160,6 +160,64 @@ router.post('/checkStatus', checkStatus);
  *         description: User not found
  */
 router.post('/checkCode', checkCode);
+
+/**
+ * @swagger
+ * /api/auth/checkEmail:
+ *   post:
+ *     summary: Check if an email exists (public)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Returns true if the email exists, false otherwise
+ *       400:
+ *         description: Invalid email format
+ */
+router.post('/checkEmail', checkEmail);
+
+/**
+ * @swagger
+ * /api/auth/resetPassword:
+ *   post:
+ *     summary: Reset password using verification code (public)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, verificationCode, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               verificationCode:
+ *                 type: string
+ *                 description: 6 digit code received via email
+ *               password:
+ *                 type: string
+ *                 description: New password to be set
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *       401:
+ *         description: Invalid verification code
+ *       404:
+ *         description: User not found
+ */
+router.post('/resetPassword', resetPassword);
 
 /**
  * @swagger

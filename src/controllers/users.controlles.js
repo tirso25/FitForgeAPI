@@ -103,34 +103,6 @@ export const getMyProfile = async (req, res) => {
     }
 }
 
-export const changePassword = async (req, res) => {
-    try {
-        const { userId } = req.user;
-        const { password } = req.body;
-        const { repeatPassword } = req.body;
-
-        if (password !== repeatPassword) {
-            return res.status(400).json({ error: 'Passwords do not match' });
-        }
-
-        const hashedPassword = await bcrypt.hash(validate.password(password), 10);
-
-        const { rows } = await pool.query(
-            'UPDATE users SET password = $1 WHERE "userId" = $2 RETURNING *',
-            [hashedPassword, userId]
-        );
-
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'User not found', });
-        }
-
-        res.status(200).json({ message: 'Password changed successfully' });
-    } catch (error) {
-        console.error('Error changing password:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-}
-
 export const profileOk = async (req, res) => {
     try {
         const { userId } = req.user;

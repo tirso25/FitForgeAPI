@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { updateUser, deleteUser, getMyProfile, changePassword, profileOk, updateProfile } from '../controllers/users.controlles.js';
-import { authenticate } from '../middleware/auth.middleware.js';    
+import { updateUser, deleteUser, getMyProfile, profileOk, updateProfile } from '../controllers/users.controlles.js';
+import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
@@ -98,40 +98,6 @@ router.put('/delete', authenticate, deleteUser)
 router.get('/update', authenticate, getMyProfile)
 
 router.put('/update', authenticate, updateUser)
-
-/**
- * @swagger
- * /api/users/changePassword:
- *   put:
- *     summary: Change the current user's password
- *     tags: [Users]
- *     security:
- *       - cookieAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [password, repeatPassword]
- *             properties:
- *               password:
- *                 type: string
- *                 format: password
- *               repeatPassword:
- *                 type: string
- *                 format: password
- *     responses:
- *       200:
- *         description: Password changed successfully
- *       400:
- *         description: Validation error or passwords do not match
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: User not found
- */
-router.put('/changePassword', authenticate, changePassword)
 
 /**
  * @swagger
