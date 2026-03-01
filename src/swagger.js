@@ -8,7 +8,7 @@ const options = {
             version: '1.0.0',
             description: 'Backend API for FitForge fitness app',
         },
-        servers: [{ url: 'http://localhost:4000' }],
+        servers: [{ url: 'https://fit-forge-api.vercel.app' }, { url: 'http://localhost:4000' }],
         components: {
             securitySchemes: {
                 cookieAuth: {
