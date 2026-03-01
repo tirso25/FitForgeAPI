@@ -430,7 +430,6 @@ export const checkEmail = async (req, res) => {
             return res.status(200).json({ status: 'inactive', message: 'Account deactivated' });
         }
 
-        // Generate a new 6-digit verification code
         const verificationCode = crypto.randomInt(100000, 999999).toString();
 
         // Save the new code in the database
