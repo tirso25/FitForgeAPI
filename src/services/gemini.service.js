@@ -38,7 +38,6 @@ export const getContextForUser = async (userId) => {
             context += `Edad: ${age} años. `;
             context += `Género: ${genderLabel}. `;
 
-            // IMC (BMI)
             const heightM = height / 100;
             const imc = weight / (heightM * heightM);
             let imcCategory;
@@ -48,7 +47,6 @@ export const getContextForUser = async (userId) => {
             else imcCategory = 'Obesidad';
             context += `IMC: ${imc.toFixed(1)} (${imcCategory}). `;
 
-            // TMB - Mifflin-St Jeor
             const tmb = data.gender === 'm'
                 ? (10 * weight) + (6.25 * height) - (5 * age) + 5
                 : (10 * weight) + (6.25 * height) - (5 * age) - 161;

@@ -7,6 +7,8 @@ export const REGEX = {
     height: /^[0-9]{1,3}([.][0-9]{1,2})?$/,
     age: /^[0-9]{1,3}$/,
     gender: /^[MF]$/,
+    name: /^[a-zA-Z]{3,50}$/,
+    description: /^.{0,255}$/,
 };
 
 export const validate = {
@@ -174,6 +176,40 @@ export const validate = {
 
         if (!REGEX.gender.test(normalized)) {
             throw new Error('Gender must be "M" or "F"');
+        }
+
+        return normalized;
+    },
+    name(value) {
+        if (!value || typeof value !== 'string') {
+            throw new Error('Name is required');
+        }
+
+        const normalized = value.trim();
+
+        if (normalized.length === 0) {
+            throw new Error('Name cannot be empty');
+        }
+
+        if (!REGEX.name.test(normalized)) {
+            throw new Error('Name must be a string');
+        }
+
+        return normalized;
+    },
+    description(value) {
+        if (!value || typeof value !== 'string') {
+            return '';
+        }
+
+        const normalized = value.trim();
+
+        if (normalized.length === 0) {
+            return '';
+        }
+
+        if (!REGEX.description.test(normalized)) {
+            throw new Error('Description must be a string');
         }
 
         return normalized;

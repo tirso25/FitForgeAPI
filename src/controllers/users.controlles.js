@@ -8,7 +8,6 @@ export const updateUser = async (req, res) => {
         const { userId } = req.user;
         await client.query('BEGIN');
 
-        // --- 1. Update users table (username, password) ---
         const userUpdates = [];
         const userValues = [];
         let paramCount = 1;
@@ -36,7 +35,6 @@ export const updateUser = async (req, res) => {
             }
         }
 
-        // --- 2. Update user_profiles table (weight, height, age, gender) ---
         const weight = req.body.weight !== undefined ? validate.weight(req.body.weight) : undefined;
         const height = req.body.height !== undefined ? validate.height(req.body.height) : undefined;
         const age = req.body.age !== undefined ? validate.age(req.body.age) : undefined;
@@ -138,11 +136,6 @@ export const updateProfile = async (req, res) => {
         const age = validate.age(req.body.age);
         const gender = validate.gender(req.body.gender);
 
-        const { rows } = await pool.query('SELECT * FROM user_ai_info WHERE user_id = $1', [userId]);
-
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
 
         await pool.query(
             `INSERT INTO user_profiles (user_id, weight, height, age, gender, updated_at)

@@ -4,7 +4,6 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import path from 'path';
-import { OAuth2Client } from 'google-auth-library';
 import transporter from '../services/mailer.service.js';
 
 const signUpMessages = [
@@ -39,15 +38,6 @@ export const signUp = async (req, res) => {
             return res.status(400).json({ type: 'error', message: 'Passwords do not match' });
         }
 
-        const { rows: existingUser } = await pool.query(
-            'SELECT "userId" FROM users WHERE email = $1 OR username = $2',
-            [email, username]
-        );
-
-        if (existingUser.length > 0) {
-            return res.status(409).json({ type: 'error', message: 'Email or username already exists' });
-        }
-
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const verificationCode = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
@@ -57,7 +47,6 @@ export const signUp = async (req, res) => {
             [email, username, hashedPassword, verificationCode]
         );
 
-        // Auto-send verification email
         try {
             const html = buildVerificationEmailHtml(username, verificationCode, email);
             await transporter.sendMail({
@@ -68,20 +57,28 @@ export const signUp = async (req, res) => {
             });
         } catch (emailError) {
             console.error('Error sending verification email:', emailError);
-            // User is created but email failed — they can resend later
         }
 
         const message = randomMessage(signUpMessages, rows[0].username);
         const encryptedEmail = encryptData(email);
         return res.status(201).json({ type: 'success', message, user: rows[0], email, encryptedEmail });
     } catch (error) {
+        if (error.code === '23505') {
+            if (error.detail?.includes('email')) {
+                return res.status(409).json({ type: 'error', message: 'Email already exists' });
+            }
+            if (error.detail?.includes('username')) {
+                return res.status(409).json({ type: 'error', message: 'Username already exists' });
+            }
+            return res.status(409).json({ type: 'error', message: 'Email or username already exists' });
+        }
         return res.status(400).json({ type: 'error', message: error.message });
     }
 }
 
 export const signIn = async (req, res) => {
     try {
-        const usermail = req.body.email?.trim();
+        const usermail = sanitize(req.body.email);
         const password = validate.password(req.body.password);
         const rememberMe = req.body.rememberMe === true || req.body.rememberme === true;
 
@@ -120,7 +117,6 @@ export const signIn = async (req, res) => {
                 [verificationCode, user.userId]
             );
 
-            // Re-send verification email
             const fullStringCode = String(verificationCode).padStart(6, '0');
             const encryptedEmailArg = encryptData(user.email);
 
@@ -230,7 +226,6 @@ export const refresh = async (req, res) => {
     }
 }
 
-// ── Helper: encrypt data (email, code, etc) ─────────────
 function encryptData(data) {
     const key = crypto.createHash('sha256').update(process.env.JWT_SECRET).digest();
     const iv = crypto.randomBytes(16);
@@ -241,9 +236,7 @@ function encryptData(data) {
 }
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
 
-// ── Helper: build verification email HTML ──────────────
 function buildVerificationEmailHtml(username, verificationCode, email, type = 'signUp') {
     const encryptedCode = encryptData(verificationCode);
     const encryptedEmail = encryptData(email);
@@ -353,7 +346,6 @@ function buildVerificationEmailHtml(username, verificationCode, email, type = 's
 </html>`;
 }
 
-// ── Public: check user status by email ──────────────────
 export const checkStatus = async (req, res) => {
     try {
         const email = validate.email(req.body.email);
@@ -374,7 +366,6 @@ export const checkStatus = async (req, res) => {
     }
 }
 
-// ── Public: verify code by email + code, activate user ──
 export const checkCode = async (req, res) => {
     try {
         const email = validate.email(req.body.email);
@@ -397,7 +388,6 @@ export const checkCode = async (req, res) => {
             return res.status(401).json({ type: 'error', message: 'Invalid verification code' });
         }
 
-        // Activate the user
         await pool.query(
             'UPDATE users SET status = $1, "verificationCode" = null WHERE email = $2',
             ['active', email]
@@ -432,14 +422,12 @@ export const checkEmail = async (req, res) => {
 
         const verificationCode = crypto.randomInt(100000, 999999).toString();
 
-        // Save the new code in the database
         await pool.query(
             'UPDATE users SET "verificationCode" = $1 WHERE email = $2',
             [verificationCode, email]
         );
 
         if (user.status === 'pending') {
-            // Send standard activation email
             const html = buildVerificationEmailHtml(user.username, verificationCode, email, 'signUp');
 
             await transporter.sendMail({
@@ -456,7 +444,6 @@ export const checkEmail = async (req, res) => {
             });
         }
 
-        // Send the change password email
         const html = buildVerificationEmailHtml(user.username, verificationCode, email, type);
 
         await transporter.sendMail({
@@ -565,8 +552,6 @@ export const decryptData = async (req, res) => {
     }
 }
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
 export const googleLogin = async (req, res) => {
     try {
         const { credential } = req.body;
@@ -601,17 +586,14 @@ export const googleLogin = async (req, res) => {
                 return res.status(403).json({ type: 'error', message: 'User is inactive' });
             }
 
-            // Mapear cuentas existentes que inician con Google
             await pool.query(
                 'UPDATE users SET "googleId" = $1, status = $2 WHERE "userId" = $3',
                 [googleId, 'active', user.userId]
             );
         } else {
-            // Generar una contraseña aleatoria súper segura (nunca la usarán)
             const randomPassword = crypto.randomBytes(32).toString('hex');
             const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
-            // Generar username único basado en su nombre
             const baseUsername = name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'user';
             const uniqueSuffix = Math.floor(1000 + Math.random() * 9000);
             const generatedUsername = `${baseUsername}${uniqueSuffix}`;
